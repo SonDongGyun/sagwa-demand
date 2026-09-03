@@ -144,7 +144,7 @@
      ──────────────────────────────────────────────────────── */
   function DictationGame(opts) {
     var sentence = opts.sentence;
-    var LIMIT = 120;
+    var LIMIT = 150;
 
     var targetEl = $('#dict-target');
     var input = $('#dict-input');
@@ -152,6 +152,8 @@
     var timeEl = $('#dict-time');
     var progEl = $('#dict-progress');
     var fillEl = $('#dict-fill');
+    var doneRow = $('#dict-done-row');
+    var doneBtn = $('#dict-done');
     var skipRow = $('#dict-skip-row');
     var skipBtn = $('#dict-skip');
     var msg = $('#dict-msg');
@@ -171,15 +173,26 @@
     // 두 번 탭하면 공백이 겹친다. 그 정도 차이로 막히지 않게 정규화해 비교한다.
     function norm(str) {
       return String(str)
-        .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
-        .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
-        .replace(/[\u2010-\u2015]/g, '-')
-        .replace(/\u2026/g, '...')
-        .replace(/[\u00A0\u3000\u200B\uFEFF]/g, ' ')
+        .replace(/[‘’‚‛′]/g, "'")
+        .replace(/[“”„‟″]/g, '"')
+        .replace(/[‐-―]/g, '-')
+        .replace(/…/g, '...')
+        .replace(/[ 　​﻿]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
     }
+    // 글자만 남긴 형태. 띄어쓰기와 문장부호가 달라도 통과시킨다.
+    // 사과의 진정성은 쉼표 위치에 있지 않다.
+    function loose(str) {
+      return norm(str).replace(/[\s.,!?~·'"–—-]/g, '');
+    }
     var normTarget = norm(sentence);
+    var looseTarget = loose(sentence);
+
+    function matches() {
+      var v = input.value;
+      return norm(v) === normTarget || loose(v) === looseTarget;
+    }
 
     // 한글은 ㅈ → 저 처럼 조합되며 들어온다. 조합 중인 마지막 글자는
     // 아직 확정이 아니므로 채점에서도, 색칠에서도 제외한다.
@@ -210,24 +223,38 @@
       typoEl.textContent = typos;
     }
 
+    /** 첫 번째로 어긋난 자리. 없으면 -1. */
+    function firstMiss() {
+      var typed = Array.from(input.value), limit = Math.min(settled(), chars.length);
+      for (var i = 0; i < limit; i++) if (typed[i] !== chars[i]) return i;
+      return -1;
+    }
+
     /** 지금 어디까지 왔고 무엇이 막고 있는지 매 입력마다 알려준다. */
     function updateStatus() {
       var typed = Array.from(input.value);
       var limit = Math.min(settled(), chars.length);
-      var wrong = 0;
-      for (var i = 0; i < limit; i++) if (typed[i] !== chars[i]) wrong++;
 
       progEl.textContent = limit + ' / ' + chars.length;
       fillEl.style.width = (limit / chars.length * 100).toFixed(1) + '%';
 
       var elapsed = startAt ? (now() - startAt) / 1000 : 0;
-      if (skipRow.hidden && (elapsed > 20 || settled() >= chars.length)) skipRow.hidden = false;
+      // 다 적었는데도 안 넘어가면 반드시 손에 잡히는 출구가 보여야 한다.
+      if (skipRow.hidden && elapsed > 15) skipRow.hidden = false;
+      doneRow.hidden = settled() < chars.length * 0.9;
 
       if (!startAt) return;
-      if (wrong) msg.textContent = '틀린 글자 ' + wrong + '개. 붉게 표시된 곳을 고치면 넘어갑니다.';
-      else if (typed.length > chars.length) msg.textContent = '문장보다 길게 적었습니다. 뒤쪽을 지우세요.';
-      else if (limit < chars.length) msg.textContent = (chars.length - limit) + '글자 남았습니다. 마침표까지 적으세요.';
-      else msg.textContent = '';
+      var miss = firstMiss();
+      if (miss >= 0) {
+        msg.innerHTML = (miss + 1) + '번째 글자가 다릅니다. <b>' + chars[miss] +
+          '</b> 여야 하는데 <b>' + (typed[miss] === ' ' ? '공백' : typed[miss]) + '</b> 를 적었습니다.';
+      } else if (typed.length > chars.length) {
+        msg.textContent = '문장보다 길게 적었습니다. 뒤쪽을 지우세요.';
+      } else if (limit < chars.length) {
+        msg.textContent = (chars.length - limit) + '글자 남았습니다. 마침표까지 적으세요.';
+      } else {
+        msg.textContent = '';
+      }
     }
 
     function onInput(e) {
@@ -237,7 +264,7 @@
         timer = setInterval(function () {
           var el = (now() - startAt) / 1000;
           timeEl.textContent = el.toFixed(1);
-          if (el > 20 && skipRow.hidden) skipRow.hidden = false;
+          if (el > 15 && skipRow.hidden) skipRow.hidden = false;
           if (el >= LIMIT) finish(false, 'time');
         }, 100);
         msg.textContent = '';
@@ -245,7 +272,7 @@
       score();
       paint();
       updateStatus();
-      if (norm(input.value) === normTarget) finish(true);
+      if (matches()) finish(true);
     }
 
     function cheat(e) {
@@ -270,26 +297,31 @@
       clearInterval(timer);
       input.blur();
       input.readOnly = true;
+      doneRow.hidden = true;
       skipRow.hidden = true;
       cleanup.forEach(function (f) { f(); });
       cleanup = [];
 
       var elapsed = startAt ? (now() - startAt) / 1000 : LIMIT;
-      var par = Math.max(14, chars.length * 0.62);
-      var score = success
-        ? Math.round(clamp(100 - typos * 5 - Math.max(0, elapsed - par) * 1.1, 0, 100))
-        : Math.round(clamp((matchedPrefix() / chars.length) * 48 - typos * 3, 0, 100));
+      // 한글은 조합해서 치느라 느리다. 다 옮겨 적었으면 45점 아래로는 내리지 않는다.
+      var par = Math.max(30, chars.length * 1.5);
+      var late = Math.max(0, elapsed - par);
+      var value = success
+        ? Math.round(clamp(100 - Math.min(30, typos * 3) - Math.min(25, late * 0.5), 45, 100))
+        : Math.round(clamp((matchedPrefix() / chars.length) * 55 - Math.min(20, typos * 2), 0, 100));
 
-      msg.textContent = success ? '문장 일치 확인.'
+      targetEl.classList.toggle('complete', !!success);
+      msg.textContent = success ? '문장 일치 확인. 접수되었습니다.'
         : reason === 'skip' ? '적은 데까지만 인정합니다.'
         : '시간 초과. 문장을 다 옮기지 못했습니다.';
       setTimeout(function () {
-        resolveFn({ score: score, detail: { success: success, typos: typos, seconds: +elapsed.toFixed(1) } });
-      }, 700);
+        resolveFn({ score: value, detail: { success: success, typos: typos, seconds: +elapsed.toFixed(1) } });
+      }, 800);
     }
 
     this.start = function () {
       targetEl.textContent = '';
+      targetEl.classList.remove('complete');
       spans = chars.map(function (ch) {
         var s = document.createElement('span');
         s.textContent = ch;
@@ -305,11 +337,24 @@
       timeEl.textContent = '0.0';
       progEl.textContent = '0 / ' + chars.length;
       fillEl.style.width = '0%';
+      doneRow.hidden = true;
       skipRow.hidden = true;
       msg.textContent = '입력창을 눌러 첫 글자를 적으면 시간이 흐릅니다.';
       paint();
       setTimeout(function () { input.focus(); }, 60);
 
+      doneBtn.onclick = function () {
+        if (matches()) return finish(true);
+        var miss = firstMiss();
+        if (miss >= 0) {
+          input.readOnly = false;
+          input.focus();
+          input.setSelectionRange(miss, Math.min(miss + 1, input.value.length));
+          msg.innerHTML = (miss + 1) + '번째 글자를 골라 뒀습니다. <b>' + chars[miss] + '</b> 로 고치세요.';
+          return;
+        }
+        finish(false, 'skip');
+      };
       skipBtn.onclick = function () { finish(false, 'skip'); };
       on(input, 'input', onInput);
       on(input, 'compositionstart', function () { composing = true; });
@@ -327,6 +372,7 @@
   function CatchGame(opts) {
     var diff = clamp(opts.difficulty || 5, 1, 10);
     var W = 480, H = 360, DURATION = 30;
+    var TARGET = 100;          // 이만큼 모으면 그 자리에서 끝난다
 
     var canvas = $('#catch-canvas');
     var ctx = canvas.getContext('2d');
@@ -339,7 +385,7 @@
 
     var basket = { x: W / 2, w: 78, h: 34 };
     var items = [], pops = [];
-    var score = 0, possible = 0, lives = 3, left = DURATION, spawnIn = 0.6;
+    var score = 0, lives = 3, left = DURATION, spawnIn = 0.6;
     var running = false, raf = 0, last = 0, keys = { l: false, r: false };
     var resolveFn = null, cleanup = [];
 
@@ -377,7 +423,6 @@
 
     function spawn() {
       var kind = pickKind();
-      if (kind.pts > 0) possible += kind.pts;   // 받을 수 있었던 총점 = 만점 기준
       items.push({
         kind: kind,
         x: 26 + Math.random() * (W - 52),
@@ -390,16 +435,16 @@
     /* 그리기 ------------------------------------------------ */
     function drawBackdrop() {
       var g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, '#f7edd8');
-      g.addColorStop(1, '#e3d4b4');
+      g.addColorStop(0, '#f4f8ff');
+      g.addColorStop(1, '#dfe7f5');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
-      ctx.strokeStyle = 'rgba(35,32,28,.06)';
+      ctx.strokeStyle = 'rgba(15,19,25,.07)';
       ctx.lineWidth = 1;
       for (var y = 40; y < H; y += 40) {
         ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke();
       }
-      ctx.fillStyle = 'rgba(35,32,28,.14)';
+      ctx.fillStyle = 'rgba(15,19,25,.13)';
       ctx.fillRect(0, H - 14, W, 3);
     }
 
@@ -407,17 +452,17 @@
       ctx.save();
       ctx.translate(x, y);
       var g = ctx.createRadialGradient(-r * .35, -r * .4, r * .2, 0, 0, r);
-      if (gold) { g.addColorStop(0, '#ffe08a'); g.addColorStop(1, '#b8892b'); }
-      else { g.addColorStop(0, '#ef6a55'); g.addColorStop(1, '#a82418'); }
+      if (gold) { g.addColorStop(0, '#ffd76a'); g.addColorStop(1, '#e09400'); }
+      else { g.addColorStop(0, '#ff6369'); g.addColorStop(1, '#b5252b'); }
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(0, -r * .55);
       ctx.bezierCurveTo(r * 1.15, -r * 1.25, r * 1.3, r * .75, 0, r);
       ctx.bezierCurveTo(-r * 1.3, r * .75, -r * 1.15, -r * 1.25, 0, -r * .55);
       ctx.fill();
-      ctx.strokeStyle = '#4a3a24'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+      ctx.strokeStyle = '#5a4632'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(0, -r * .7); ctx.lineTo(r * .18, -r * 1.25); ctx.stroke();
-      ctx.fillStyle = '#4c7c46';
+      ctx.fillStyle = '#30a46c';
       ctx.beginPath();
       ctx.ellipse(r * .55, -r * 1.05, r * .42, r * .2, -0.5, 0, Math.PI * 2);
       ctx.fill();
@@ -430,7 +475,7 @@
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(spin);
-      ctx.fillStyle = '#6f6a63';
+      ctx.fillStyle = '#5f6874';
       ctx.beginPath();
       ctx.moveTo(-r, 0);
       ctx.lineTo(-r * .55, -r * .85);
@@ -449,8 +494,8 @@
       ctx.save();
       ctx.translate(x, y);
       var w = r * 2.3, h = r * 1.5;
-      ctx.fillStyle = '#fffdf6';
-      ctx.strokeStyle = '#8a8175';
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#8b95a6';
       ctx.lineWidth = 2;
       var rad = 8;
       ctx.beginPath();
@@ -464,7 +509,7 @@
       ctx.arcTo(-w / 2, -h / 2, w / 2, -h / 2, rad);
       ctx.closePath();
       ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#8e2018';
+      ctx.fillStyle = '#b5252b';
       ctx.font = 'bold 13px system-ui, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('변명', 0, 0);
@@ -559,9 +604,10 @@
           pops.push({
             x: it.x, y: catchTop - 6, life: 1,
             text: (it.kind.pts > 0 ? '+' : '') + it.kind.pts,
-            color: it.kind.pts > 0 ? '#2f7a4f' : '#c0392b'
+            color: it.kind.pts > 0 ? '#218358' : '#e5484d'
           });
           scoreEl.textContent = score;
+          if (score >= TARGET) { draw(); return finish('goal'); }
           if (lives <= 0) { draw(); return finish('lives'); }
         } else if (it.y - it.kind.r > H) {
           items.splice(i, 1);
@@ -585,20 +631,19 @@
       cleanup.forEach(function (f) { f(); });
       cleanup = [];
 
-      // 만점 기준은 고정값이 아니라 "실제로 떨어진 사과의 총점".
-      // 다 받으면 100점이다. 마음이 다 닳아 일찍 끝나면 남은 시간만큼
-      // 더 떨어졌을 사과를 감안해 기준을 늘린다.
-      var elapsed = Math.max(1, DURATION - Math.max(0, left));
-      var expected = Math.max(1, possible * (DURATION / elapsed));
-      var normalized = Math.round(clamp(score / expected * 100, 0, 100));
+      // 목표는 사과 100점. 모으면 그 자리에서 끝나고 진정성도 100점이다.
+      var normalized = Math.round(clamp(score / TARGET * 100, 0, 100));
+      var head = reason === 'goal' ? '사과 100점을 모았습니다.'
+        : reason === 'lives' ? '마음이 다 닳았습니다.'
+        : '시간 종료.';
 
       overlay.hidden = false;
-      overlay.innerHTML = '<p>' + (reason === 'lives' ? '마음이 다 닳았습니다.' : '심사 종료.')
-        + '<br>주운 사과 <b>' + score + '</b>점 / 떨어진 사과 <b>' + Math.round(expected) + '</b>점'
+      overlay.innerHTML = '<p>' + head
+        + '<br>모은 사과 <b>' + score + '</b> / 목표 <b>' + TARGET + '</b>'
         + '<br>→ 진정성 <b>' + normalized + '</b>점</p>';
       msg.textContent = '';
       setTimeout(function () {
-        resolveFn({ score: normalized, detail: { raw: score, possible: Math.round(expected), lives: lives, reason: reason } });
+        resolveFn({ score: normalized, detail: { raw: score, target: TARGET, lives: lives, reason: reason } });
       }, 1100);
     }
 
@@ -610,7 +655,7 @@
 
     this.start = function () {
       items = []; pops = [];
-      score = 0; possible = 0; lives = 3; left = DURATION; spawnIn = 0.5;
+      score = 0; lives = 3; left = DURATION; spawnIn = 0.5;
       basket.x = W / 2;
       scoreEl.textContent = '0';
       timeEl.textContent = DURATION.toFixed(1);
@@ -627,7 +672,7 @@
       if (/[?&]debug=1/.test(location.search)) {
         global.__catchState = function () {
           return {
-            w: W, h: H, basket: basket.x, score: score, possible: possible, lives: lives, left: left,
+            w: W, h: H, basket: basket.x, score: score, target: TARGET, lives: lives, left: left,
             items: items.map(function (i) { return { x: i.x, y: i.y, k: i.kind.k }; })
           };
         };

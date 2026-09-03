@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>사과 요구서 · 진정성 심사원</title>
 <meta name="description" content="상대방에게 정식으로 사과를 요구하고, 3단계 진정성 심사로 검증하는 웹 페이지." />
-<meta name="theme-color" content="#141210" />
+<meta name="theme-color" content="#0b0d12" />
 <meta property="og:title" content="사과 요구서 · 진정성 심사원" />
 <meta property="og:description" content="말로만 하는 사과는 접수되지 않습니다. 3단계 심사를 통과하세요." />
 <meta property="og:type" content="website" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8D%8E%3C/text%3E%3C/svg%3E" />
-<link rel="stylesheet" href="styles.css" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
 <div class="grain" aria-hidden="true"></div>
@@ -30,7 +32,7 @@
     <div class="paper">
       <div class="paper-head">
         <p class="doc-no">문서번호 <span id="write-docno">제0000호</span></p>
-        <h1 class="doc-title">사 과 요 구 서</h1>
+        <h1 class="doc-title">사과 요구서</h1>
         <p class="doc-sub">아래 사항에 대하여 정식으로 사과를 요구합니다.</p>
       </div>
 
@@ -94,7 +96,7 @@
     <div class="paper">
       <div class="paper-head">
         <p class="doc-no">문서번호 <span id="demand-docno">제0000호</span></p>
-        <h1 class="doc-title">사 과 요 구 서</h1>
+        <h1 class="doc-title">사과 요구서</h1>
       </div>
       <dl class="record">
         <div><dt>피청구인</dt><dd id="d-to">—</dd></div>
@@ -163,7 +165,7 @@
     <div class="paper">
       <p class="trial-step">심사 2 / 3</p>
       <h1 class="doc-title sm">사과문 받아쓰기</h1>
-      <p class="lede">아래 문장을 <strong>한 글자도 틀리지 않고</strong> 입력하세요. 붙여넣기는 진정성 없음으로 처리됩니다.<br /><em>문장이 완전히 일치하면 자동으로 다음 심사로 넘어갑니다.</em></p>
+      <p class="lede">아래 문장을 <strong>한 글자도 틀리지 않고</strong> 입력하세요. 붙여넣기는 진정성 없음으로 처리됩니다.<br /><em>문장이 일치하면 자동으로 넘어갑니다. 띄어쓰기와 문장부호는 조금 달라도 봐줍니다.</em></p>
 
       <p class="dictation-target" id="dict-target"></p>
       <textarea class="dictation-input" id="dict-input" rows="3" spellcheck="false" autocomplete="off" placeholder="여기에 그대로 옮겨 적으세요"></textarea>
@@ -174,7 +176,10 @@
           <div class="meter-bar"><div class="meter-fill ok" id="dict-fill"></div></div>
         </div>
         <div class="meter"><span class="meter-label">오타 <b id="dict-typos">0</b>회</span></div>
-        <div class="meter"><span class="meter-label">경과 <b id="dict-time">0.0</b>초 <em>(제한 120초)</em></span></div>
+        <div class="meter"><span class="meter-label">경과 <b id="dict-time">0.0</b>초 <em>(제한 150초)</em></span></div>
+      </div>
+      <div class="btn-row" id="dict-done-row" hidden>
+        <button class="btn btn-primary" id="dict-done" type="button">다 적었습니다 · 제출</button>
       </div>
       <div class="btn-row" id="dict-skip-row" hidden>
         <button class="btn btn-ghost" id="dict-skip" type="button">그만 쓰고 다음 심사로</button>
@@ -188,10 +193,10 @@
     <div class="paper">
       <p class="trial-step">심사 3 / 3</p>
       <h1 class="doc-title sm">사과 줍기</h1>
-      <p class="lede">떨어지는 <strong>사과</strong>를 받으세요. <strong>변명</strong>과 <strong>돌</strong>을 받으면 진정성이 깎입니다.<br />떨어진 사과를 <strong>다 받으면 100점</strong>입니다.<br /><em>마우스 · 화면 아무 곳이나 드래그 · ← → 키</em></p>
+      <p class="lede">떨어지는 <strong>사과</strong>를 받으세요. <strong>변명</strong>과 <strong>돌</strong>을 받으면 진정성이 깎입니다.<br />사과를 <strong>100점</strong>어치 모으면 그 자리에서 통과입니다.<br /><em>마우스 · 화면 아무 곳이나 드래그 · ← → 키</em></p>
 
       <div class="hud">
-        <span class="hud-item">점수 <b id="catch-score">0</b></span>
+        <span class="hud-item">사과 <b id="catch-score">0</b> / 100</span>
         <span class="hud-item">시간 <b id="catch-time">30.0</b></span>
         <span class="hud-item">마음 <b id="catch-lives">♥♥♥</b></span>
       </div>
@@ -210,7 +215,7 @@
     <div class="paper cert" id="cert">
       <div class="cert-border">
         <p class="doc-no">심사번호 <span id="v-docno">제0000호</span></p>
-        <h1 class="doc-title">사 과 심 사 결 과</h1>
+        <h1 class="doc-title">사과 심사 결과</h1>
 
         <div class="grade-wrap">
           <p class="grade-letter" id="v-grade">B</p>
@@ -288,8 +293,8 @@
   <p>본 문서는 법적 효력이 없습니다. 진짜 사과는 직접 하세요.</p>
 </footer>
 
-<script src="js/share.js"></script>
-<script src="js/games.js"></script>
-<script src="js/app.js"></script>
+<script src="js/share.js?v=3"></script>
+<script src="js/games.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
 </body>
 </html>
