@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>사과 요구서 · 진정성 심사원</title>
+<meta name="description" content="상대방에게 정식으로 사과를 요구하고, 3단계 진정성 심사로 검증하는 웹 페이지." />
+<meta name="theme-color" content="#141210" />
+<meta property="og:title" content="사과 요구서 · 진정성 심사원" />
+<meta property="og:description" content="말로만 하는 사과는 접수되지 않습니다. 3단계 심사를 통과하세요." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8D%8E%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a class="brand" href="./" aria-label="사과 요구서 처음으로">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-text">사과 요구서<em>제 3 심사과</em></span>
+  </a>
+  <p class="topbar-note" id="topbar-note">말로만 하는 사과는 접수되지 않습니다.</p>
+</header>
+
+<main id="main">
+
+  <!-- ───────── 1. 요구서 작성 ───────── -->
+  <section class="screen" id="screen-write" hidden>
+    <div class="paper">
+      <div class="paper-head">
+        <p class="doc-no">문서번호 <span id="write-docno">제0000호</span></p>
+        <h1 class="doc-title">사 과 요 구 서</h1>
+        <p class="doc-sub">아래 사항에 대하여 정식으로 사과를 요구합니다.</p>
+      </div>
+
+      <form id="form-demand" class="form" novalidate>
+        <div class="row2">
+          <label class="field">
+            <span class="label">청구인 <em>(나)</em></span>
+            <input id="f-from" name="from" type="text" maxlength="16" placeholder="예: 동균" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span class="label">피청구인 <em>(사과할 사람)</em></span>
+            <input id="f-to" name="to" type="text" maxlength="16" placeholder="예: 친구야" autocomplete="off" required />
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="label">사건의 요지 <em>(무엇에 대한 사과인가)</em></span>
+          <textarea id="f-what" name="what" maxlength="120" rows="2" placeholder="예: 약속 시간에 40분 늦고도 배고프다고 먼저 말한 것" required></textarea>
+          <span class="counter"><span id="f-what-count">0</span>/120</span>
+        </label>
+
+        <div class="field">
+          <span class="label">분노 게이지 <em>(심사 난이도가 올라갑니다)</em></span>
+          <div class="anger">
+            <input id="f-anger" name="anger" type="range" min="1" max="10" value="6" />
+            <output id="f-anger-out" class="anger-out" for="f-anger">6 · 꽤 화남</output>
+          </div>
+          <div class="anger-bar"><div class="anger-fill" id="f-anger-fill"></div></div>
+        </div>
+
+        <fieldset class="field terms">
+          <legend class="label">요구 조건 <em>(요구서에 함께 적힙니다)</em></legend>
+          <div class="term-grid" id="f-terms"></div>
+        </fieldset>
+
+        <button class="btn btn-primary btn-lg" type="submit">요구서 발부하기</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ───────── 2. 발부 완료 ───────── -->
+  <section class="screen" id="screen-sent" hidden>
+    <div class="paper paper-narrow center">
+      <div class="stamp stamp-sent" aria-hidden="true"><span>발<br>부</span></div>
+      <h1 class="doc-title sm">요구서가 발부되었습니다</h1>
+      <p class="lede">아래 링크를 <strong id="sent-to">상대</strong>에게 보내세요.<br />열어보면 도망갈 수 없습니다.</p>
+      <div class="linkbox">
+        <input id="sent-link" type="text" readonly aria-label="공유 링크" />
+        <button class="btn btn-primary" id="btn-copy" type="button">복사</button>
+      </div>
+      <p class="hint" id="copy-hint" role="status" aria-live="polite"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btn-preview" type="button">내가 먼저 열어보기</button>
+        <button class="btn btn-ghost" id="btn-rewrite" type="button">다시 쓰기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── 3. 요구서 열람 ───────── -->
+  <section class="screen" id="screen-demand" hidden>
+    <div class="paper">
+      <div class="paper-head">
+        <p class="doc-no">문서번호 <span id="demand-docno">제0000호</span></p>
+        <h1 class="doc-title">사 과 요 구 서</h1>
+      </div>
+      <dl class="record">
+        <div><dt>피청구인</dt><dd id="d-to">—</dd></div>
+        <div><dt>청구인</dt><dd id="d-from">—</dd></div>
+        <div><dt>분노 등급</dt><dd id="d-anger">—</dd></div>
+      </dl>
+      <div class="case">
+        <p class="case-label">사건의 요지</p>
+        <p class="case-body" id="d-what"></p>
+      </div>
+      <div class="case" id="d-terms-wrap">
+        <p class="case-label">요구 조건</p>
+        <ul class="term-list" id="d-terms"></ul>
+      </div>
+      <p class="doc-foot">본 요구서는 <span id="d-date">—</span> 자로 효력이 발생하며,<br />구두 사과만으로는 접수되지 않습니다. <strong>3단계 진정성 심사</strong>를 거쳐야 합니다.</p>
+
+      <div class="dodge-field" id="dodge-field">
+        <button class="btn btn-primary btn-lg" id="btn-accept" type="button">사과하겠습니다</button>
+        <button class="btn btn-dodge" id="btn-refuse" type="button">미안한데 내가 왜?</button>
+      </div>
+      <p class="hint center" id="dodge-hint" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ───────── 4-1. 심사 1 : 정중히 고개 숙이기 ───────── -->
+  <section class="screen" id="screen-bow" hidden>
+    <div class="paper">
+      <p class="trial-step">심사 1 / 3</p>
+      <h1 class="doc-title sm">정중히 고개 숙이기</h1>
+      <p class="lede">버튼을 눌러 고개를 숙입니다. <strong>초록 구간</strong>에서 <strong>3.0초</strong>를 버티세요.<br />너무 깊이 숙이면 이마를 찧습니다.</p>
+
+      <div class="bow-stage">
+        <div class="bow-figure" id="bow-figure">
+          <div class="bow-head"></div>
+          <div class="bow-body"></div>
+        </div>
+        <div class="bow-floor"></div>
+      </div>
+
+      <div class="gauge" aria-hidden="true">
+        <div class="gauge-zone"></div>
+        <div class="gauge-needle" id="bow-needle"></div>
+      </div>
+      <div class="gauge-legend"><span>0°</span><span class="ok">정중 구간 78°–92°</span><span>110°</span></div>
+
+      <div class="meters">
+        <div class="meter">
+          <span class="meter-label">유지 <b id="bow-held">0.00</b> / 3.00초</span>
+          <div class="meter-bar"><div class="meter-fill ok" id="bow-hold-fill"></div></div>
+        </div>
+        <div class="meter">
+          <span class="meter-label">남은 시간 <b id="bow-time">15.0</b>초</span>
+          <div class="meter-bar"><div class="meter-fill" id="bow-time-fill"></div></div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg btn-hold" id="bow-btn" type="button">
+        누르고 있기 <em>(Space / 클릭)</em>
+      </button>
+      <p class="hint center" id="bow-msg" role="status" aria-live="polite">준비되면 눌러서 시작하세요.</p>
+    </div>
+  </section>
+
+  <!-- ───────── 4-2. 심사 2 : 사과문 받아쓰기 ───────── -->
+  <section class="screen" id="screen-dictation" hidden>
+    <div class="paper">
+      <p class="trial-step">심사 2 / 3</p>
+      <h1 class="doc-title sm">사과문 받아쓰기</h1>
+      <p class="lede">아래 문장을 <strong>한 글자도 틀리지 않고</strong> 입력하세요. 붙여넣기는 진정성 없음으로 처리됩니다.</p>
+
+      <p class="dictation-target" id="dict-target"></p>
+      <textarea class="dictation-input" id="dict-input" rows="3" spellcheck="false" autocomplete="off" placeholder="여기에 그대로 옮겨 적으세요"></textarea>
+
+      <div class="meters">
+        <div class="meter"><span class="meter-label">오타 <b id="dict-typos">0</b>회</span></div>
+        <div class="meter"><span class="meter-label">경과 <b id="dict-time">0.0</b>초 <em>(제한 90초)</em></span></div>
+      </div>
+      <p class="hint center" id="dict-msg" role="status" aria-live="polite">첫 글자를 입력하면 시간이 흐릅니다.</p>
+    </div>
+  </section>
+
+  <!-- ───────── 4-3. 심사 3 : 사과 줍기 ───────── -->
+  <section class="screen" id="screen-catch" hidden>
+    <div class="paper">
+      <p class="trial-step">심사 3 / 3</p>
+      <h1 class="doc-title sm">사과 줍기</h1>
+      <p class="lede">떨어지는 <strong>사과</strong>를 받으세요. <strong>변명</strong>과 <strong>돌</strong>을 받으면 진정성이 깎입니다.<br /><em>마우스 · 터치 드래그 · ← → 키</em></p>
+
+      <div class="hud">
+        <span class="hud-item">점수 <b id="catch-score">0</b></span>
+        <span class="hud-item">시간 <b id="catch-time">30.0</b></span>
+        <span class="hud-item">마음 <b id="catch-lives">♥♥♥</b></span>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="catch-canvas" width="480" height="360" aria-label="사과 줍기 미니게임"></canvas>
+        <div class="canvas-overlay" id="catch-overlay">
+          <button class="btn btn-primary btn-lg" id="catch-start" type="button">시작</button>
+        </div>
+      </div>
+      <p class="hint center" id="catch-msg" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ───────── 5. 판정 ───────── -->
+  <section class="screen" id="screen-verdict" hidden>
+    <div class="paper cert" id="cert">
+      <div class="cert-border">
+        <p class="doc-no">심사번호 <span id="v-docno">제0000호</span></p>
+        <h1 class="doc-title">사 과 심 사 결 과</h1>
+
+        <div class="grade-wrap">
+          <p class="grade-letter" id="v-grade">B</p>
+          <p class="grade-name" id="v-gradename">조건부 수용</p>
+        </div>
+
+        <div class="score-big">
+          <span>진정성 지수</span>
+          <b id="v-score">0</b><span class="unit">점</span>
+        </div>
+
+        <ul class="score-list">
+          <li><span>정중히 고개 숙이기</span><b id="v-bow">0</b></li>
+          <li><span>사과문 받아쓰기</span><b id="v-dict">0</b></li>
+          <li><span>사과 줍기</span><b id="v-catch">0</b></li>
+          <li class="penalty" id="v-penalty-row" hidden><span>도주 시도 감점</span><b id="v-penalty">0</b></li>
+        </ul>
+
+        <p class="verdict-text" id="v-text"></p>
+
+        <dl class="record small">
+          <div><dt>피청구인</dt><dd id="v-to">—</dd></div>
+          <div><dt>청구인</dt><dd id="v-from">—</dd></div>
+          <div><dt>사건</dt><dd id="v-what">—</dd></div>
+          <div><dt>심사일</dt><dd id="v-date">—</dd></div>
+        </dl>
+
+        <div class="stamp stamp-verdict" id="v-stamp" aria-hidden="true"><span>사과<br>심사원</span></div>
+      </div>
+    </div>
+
+    <div class="paper paper-narrow center after-cert">
+      <p class="best" id="v-best"></p>
+      <div class="linkbox">
+        <input id="v-link" type="text" readonly aria-label="결과 공유 링크" />
+        <button class="btn btn-primary" id="v-copy" type="button">복사</button>
+      </div>
+      <p class="hint" id="v-copy-hint" role="status" aria-live="polite">청구인에게 이 링크를 보내면 결과가 전달됩니다.</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="v-retry" type="button">재심 청구 (다시 하기)</button>
+        <button class="btn btn-ghost" id="v-print" type="button">인쇄 / PDF 저장</button>
+        <button class="btn btn-ghost" id="v-new" type="button">나도 요구서 쓰기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── 6. 결과 수령 (청구인) ───────── -->
+  <section class="screen" id="screen-receipt" hidden>
+    <div class="paper paper-narrow center">
+      <div class="stamp stamp-sent" aria-hidden="true"><span>도<br>착</span></div>
+      <h1 class="doc-title sm">사과 심사 결과가 도착했습니다</h1>
+      <p class="lede"><strong id="r-to">상대</strong>가 심사를 마쳤습니다.</p>
+      <div class="grade-wrap">
+        <p class="grade-letter" id="r-grade">B</p>
+        <p class="grade-name" id="r-gradename">조건부 수용</p>
+      </div>
+      <div class="score-big"><span>진정성 지수</span><b id="r-score">0</b><span class="unit">점</span></div>
+      <ul class="score-list">
+        <li><span>정중히 고개 숙이기</span><b id="r-bow">0</b></li>
+        <li><span>사과문 받아쓰기</span><b id="r-dict">0</b></li>
+        <li><span>사과 줍기</span><b id="r-catch">0</b></li>
+      </ul>
+      <p class="verdict-text" id="r-text"></p>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="r-accept" type="button">사과를 받아들인다</button>
+        <button class="btn btn-ghost" id="r-reject" type="button">재심 요구</button>
+      </div>
+      <p class="hint center" id="r-msg" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>본 문서는 법적 효력이 없습니다. 진짜 사과는 직접 하세요.</p>
+</footer>
+
+<script src="js/share.js"></script>
+<script src="js/games.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
