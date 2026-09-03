@@ -72,9 +72,13 @@
     return word + (hasJong ? pair[0] : pair[1]);
   }
 
-  function ellipsis(s, n) {
+  /** 받아쓰기용으로 줄인다. 키보드로 칠 수 없는 문자는 절대 넣지 않는다. */
+  function shorten(s, n) {
     var a = Array.from(s);
-    return a.length > n ? a.slice(0, n).join('') + '…' : s;
+    if (a.length <= n) return s;
+    var cut = a.slice(0, n).join('');
+    var sp = cut.lastIndexOf(' ');
+    return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,·]+$/, '');
   }
 
   function bindCopy(inputSel, btnSel, hintSel) {
@@ -221,6 +225,8 @@
 
     function dodge(e) {
       if (state.dodges >= 6) return;
+      // 터치에서는 pointerenter 와 touchstart 가 함께 오므로 한 번만 센다.
+      if (e && e.type === 'pointerenter' && e.pointerType === 'touch') return;
       if (e) e.preventDefault();
       state.dodges++;
 
@@ -266,8 +272,8 @@
     new Games.Bow({ difficulty: diff }).start().then(function (bow) {
       state.results.bow = bow;
 
-      var sentence = '저 ' + josa(d.to, ['은', '는']) + ' "' + ellipsis(d.what, 34)
-                   + '" 에 대하여 ' + d.from + '에게 진심으로 사과합니다. 다시는 같은 일이 없도록 하겠습니다.';
+      var sentence = josa(d.to, ['은', '는']) + ' ' + shorten(d.what, 30)
+                   + ', 이 일에 대해 ' + d.from + '에게 진심으로 사과합니다. 다시는 안 그러겠습니다.';
       showScreen('screen-dictation', '심사 2 / 3 · 사과문 받아쓰기');
       return new Games.Dictation({ sentence: sentence }).start();
     }).then(function (dict) {

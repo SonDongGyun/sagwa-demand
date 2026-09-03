@@ -163,16 +163,23 @@
     <div class="paper">
       <p class="trial-step">심사 2 / 3</p>
       <h1 class="doc-title sm">사과문 받아쓰기</h1>
-      <p class="lede">아래 문장을 <strong>한 글자도 틀리지 않고</strong> 입력하세요. 붙여넣기는 진정성 없음으로 처리됩니다.</p>
+      <p class="lede">아래 문장을 <strong>한 글자도 틀리지 않고</strong> 입력하세요. 붙여넣기는 진정성 없음으로 처리됩니다.<br /><em>문장이 완전히 일치하면 자동으로 다음 심사로 넘어갑니다.</em></p>
 
       <p class="dictation-target" id="dict-target"></p>
       <textarea class="dictation-input" id="dict-input" rows="3" spellcheck="false" autocomplete="off" placeholder="여기에 그대로 옮겨 적으세요"></textarea>
 
-      <div class="meters">
+      <div class="meters three">
+        <div class="meter">
+          <span class="meter-label">진행 <b id="dict-progress">0 / 0</b></span>
+          <div class="meter-bar"><div class="meter-fill ok" id="dict-fill"></div></div>
+        </div>
         <div class="meter"><span class="meter-label">오타 <b id="dict-typos">0</b>회</span></div>
-        <div class="meter"><span class="meter-label">경과 <b id="dict-time">0.0</b>초 <em>(제한 90초)</em></span></div>
+        <div class="meter"><span class="meter-label">경과 <b id="dict-time">0.0</b>초 <em>(제한 120초)</em></span></div>
       </div>
-      <p class="hint center" id="dict-msg" role="status" aria-live="polite">첫 글자를 입력하면 시간이 흐릅니다.</p>
+      <div class="btn-row" id="dict-skip-row" hidden>
+        <button class="btn btn-ghost" id="dict-skip" type="button">그만 쓰고 다음 심사로</button>
+      </div>
+      <p class="hint center" id="dict-msg" role="status" aria-live="polite">입력창을 눌러 첫 글자를 적으면 시간이 흐릅니다.</p>
     </div>
   </section>
 
@@ -181,7 +188,7 @@
     <div class="paper">
       <p class="trial-step">심사 3 / 3</p>
       <h1 class="doc-title sm">사과 줍기</h1>
-      <p class="lede">떨어지는 <strong>사과</strong>를 받으세요. <strong>변명</strong>과 <strong>돌</strong>을 받으면 진정성이 깎입니다.<br /><em>마우스 · 터치 드래그 · ← → 키</em></p>
+      <p class="lede">떨어지는 <strong>사과</strong>를 받으세요. <strong>변명</strong>과 <strong>돌</strong>을 받으면 진정성이 깎입니다.<br />떨어진 사과를 <strong>다 받으면 100점</strong>입니다.<br /><em>마우스 · 화면 아무 곳이나 드래그 · ← → 키</em></p>
 
       <div class="hud">
         <span class="hud-item">점수 <b id="catch-score">0</b></span>

@@ -306,7 +306,8 @@ input.invalid, textarea.invalid { border-color: var(--red); background: rgba(192
 }
 .gauge-legend .ok { color: var(--green); font-weight: 700; }
 
-.meters { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-bottom: 18px; }
+.meters { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; margin-bottom: 18px; align-items: start; }
+.meters.three { grid-template-columns: 1.4fr 1fr 1fr; }
 .meter-label { display: block; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 5px; }
 .meter-label b { font-family: var(--mono); font-size: 14px; color: var(--ink); }
 .meter-label em { font-style: normal; color: var(--ink-faint); }
@@ -392,7 +393,7 @@ input.invalid, textarea.invalid { border-color: var(--red); background: rgba(192
 
 /* ── 반응형 ────────────────────────────── */
 @media (max-width: 560px) {
-  .row2, .term-grid, .meters { grid-template-columns: 1fr; }
+  .row2, .term-grid, .meters, .meters.three { grid-template-columns: 1fr; }
   .record > div { grid-template-columns: 84px 1fr; }
   .stamp-verdict { width: 84px; height: 84px; font-size: 13px; }
   .linkbox { flex-direction: column; }
