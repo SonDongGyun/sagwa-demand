@@ -33,6 +33,8 @@
   var state = {
     demand: null,
     receipt: null,
+    code: null,          // 서버가 발급한 8자 사건 코드. 없으면 URL 토큰만 쓴다
+    file: [],
     dodges: 0,
     results: { bow: null, dictation: null, 'catch': null }
   };
@@ -149,16 +151,30 @@
         at: Date.now()
       };
       state.demand = demand;
+      state.code = null;
 
+      // 링크를 먼저 띄우고, 서버가 살아 있으면 짧은 코드로 바꿔 끼운다.
       var url = Share.link({ d: Share.encode(demand) });
       $('#sent-link').value = url;
       $('#sent-to').textContent = demand.to;
       $('#copy-hint').textContent = '';
       showScreen('screen-sent', '요구서 발부 완료.');
       try { history.replaceState(null, '', url); } catch (err) { /* file:// 등 */ }
+
+      Store.available().then(function (on) {
+        return on ? Store.createCase(demand) : null;
+      }).then(function (code) {
+        if (!code) return;
+        state.code = code;
+        var short = Share.link({ d: code });
+        $('#sent-link').value = short;
+        $('#copy-hint').textContent = '사건번호 ' + code + ' 로 접수했습니다. 링크가 짧아졌습니다.';
+        try { history.replaceState(null, '', short); } catch (err) {}
+      });
     });
 
     $('#btn-copy') && bindCopy('#sent-link', '#btn-copy', '#copy-hint');
+    $('#btn-file').addEventListener('click', function () { openFile(); });
     $('#btn-preview').addEventListener('click', function () { openDemand(state.demand); });
     $('#btn-rewrite').addEventListener('click', function () {
       try { history.replaceState(null, '', Share.link({})); } catch (err) {}
@@ -342,6 +358,17 @@
     $('#v-copy-hint').textContent = '청구인에게 이 링크를 보내면 결과가 전달됩니다.';
 
     showScreen('screen-verdict', '심사 종료.');
+
+    if (state.code) {
+      Store.saveVerdict(state.code, {
+        score: score, bow: r.bow.score, dict: r.dictation.score,
+        cat: r['catch'].score, penalty: pen, grade: grade.letter
+      }).then(function (st) {
+        if (!st) return;
+        $('#v-link').value = Share.link({ r: state.code });
+        $('#v-copy-hint').textContent = '사건번호 ' + state.code + ' 에 기록했습니다. 청구인에게 이 링크를 보내세요.';
+      });
+    }
   }
 
   function initVerdictScreen() {
@@ -459,14 +486,20 @@
         sheet.classList.remove('shook');
       }, 340);
 
+      var word = $('#seal-word').value.trim();
+      var pending = state.code ? Store.settle(state.code, shorten(word, 60)) : Promise.resolve(null);
+
       setTimeout(function () {
-        var word = $('#seal-word').value.trim();
         var r = seal.rec;
-        openCert({
+        var acc = {
           v: 1, to: r.to, from: r.from, what: r.what, s: r.s,
           b: r.b, t: r.t, c: r.c, p: r.p, at: r.at,
           w: word ? shorten(word, 60) : '', aat: Date.now()
-        }, true);
+        };
+        pending.then(function (st) {
+          if (st) { acc.code = state.code; acc.aat = (st.settle && st.settle.aat) || acc.aat; }
+          openCert(acc, true);
+        });
       }, 1250);
     }
 
@@ -561,16 +594,23 @@
     st.classList.remove('hit');
     setTimeout(function () { st.classList.add('hit'); }, 600);
 
+    // 단서 조항이 집행된 상태. 종이를 가로질러 붉은 띠가 남는다.
+    var dead = !!acc.voided;
+    $('#a-void').hidden = !dead;
+    $('#a-void-why').textContent = acc.reason ? '“' + acc.reason + '”' : '';
+
     $('#a-share').hidden = !mine;
     $('#a-copy-hint').textContent = '';
-    $('#a-note').textContent = mine
-      ? '사과한 사람에게 이 링크를 보내면 수리증이 전달됩니다.'
-      : '이 건은 종결되었습니다. 수리증을 인쇄해 두셔도 됩니다.';
+    $('#a-note').textContent = dead
+      ? '동일 사건이 재발하여 이 수리증은 효력을 잃었습니다.'
+      : mine
+        ? '사과한 사람에게 이 링크를 보내면 수리증이 전달됩니다.'
+        : '이 건은 종결되었습니다. 수리증을 인쇄해 두셔도 됩니다.';
 
-    if (mine) $('#a-link').value = Share.link({ a: Share.encode(acc) });
+    if (mine) $('#a-link').value = acc.code ? Share.link({ a: acc.code }) : Share.link({ a: Share.encode(acc) });
 
-    showScreen('screen-cert', mine ? '수리증 발급 완료.' : '사과가 수리되었습니다.');
-    if (!mine) appleRain(4200);
+    showScreen('screen-cert', dead ? '효력 상실.' : mine ? '수리증 발급 완료.' : '사과가 수리되었습니다.');
+    if (!mine && !dead) appleRain(4200);
   }
 
   function initCertScreen() {
@@ -659,6 +699,218 @@
     requestAnimationFrame(frame);
   }
 
+  /* ── 8. 사건철 ─────────────────────────────── */
+
+  var STATUS = {
+    wait:   { cls: 'wait',   text: '심사 대기', mode: 'd' },
+    judged: { cls: 'judged', text: '판정 완료', mode: 'r' },
+    sealed: { cls: 'sealed', text: '수리됨',    mode: 'a' },
+    dead:   { cls: 'void',   text: '효력 상실', mode: 'a' }
+  };
+
+  function statusOf(st) {
+    if (st.settle && st.settle.voided) return 'dead';
+    if (st.settle) return 'sealed';
+    if (st.verdict) return 'judged';
+    return 'wait';
+  }
+
+  /** 서버가 준 사건 상태를 화면들이 아는 모양으로 되돌린다. */
+  function asDemand(st) {
+    return { v: 1, to: st.to, from: st.from, what: st.what, anger: st.anger, terms: st.terms, at: st.at };
+  }
+  function asReceipt(st) {
+    var v = st.verdict;
+    return { v: 1, to: st.to, from: st.from, what: st.what,
+             s: v.s, b: v.b, t: v.t, c: v.c, p: v.p, at: v.at };
+  }
+  function asAccept(st) {
+    var v = st.verdict, g = st.settle;
+    return { v: 1, to: st.to, from: st.from, what: st.what,
+             s: v.s, b: v.b, t: v.t, c: v.c, p: v.p, at: v.at,
+             w: g.w, aat: g.aat, code: st.c, voided: g.voided, reason: g.reason };
+  }
+
+  function btn(label, cls, fn) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn ' + cls;
+    b.textContent = label;
+    b.addEventListener('click', function () { fn(b); });
+    return b;
+  }
+
+  function caseCard(st) {
+    var key = statusOf(st), meta = STATUS[key];
+    var card = document.createElement('article');
+    card.className = 'case-card';
+
+    var top = document.createElement('div');
+    top.className = 'case-top';
+    var who = document.createElement('span');
+    who.className = 'case-who';
+    who.textContent = st.to;
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + meta.cls;
+    badge.textContent = meta.text;
+    top.appendChild(who);
+    top.appendChild(badge);
+
+    var what = document.createElement('p');
+    what.className = 'case-what';
+    what.textContent = st.what;
+
+    var bits = [dateStr(st.at)];
+    if (st.verdict) bits.push(st.verdict.grade + ' · 진정성 ' + st.verdict.s + '점');
+    if (st.tries > 1) bits.push('심사 ' + st.tries + '회');
+    var line = document.createElement('p');
+    line.className = 'case-meta';
+    line.textContent = bits.join(' · ') + ' · ' + st.c;
+
+    var acts = document.createElement('div');
+    acts.className = 'case-acts';
+    acts.appendChild(btn('열기', 'btn-ghost', function () { openByCode(meta.mode, st.c); }));
+    acts.appendChild(btn('링크 복사', 'btn-ghost', function (b) {
+      var url = Share.link(meta.mode === 'd' ? { d: st.c } : meta.mode === 'r' ? { r: st.c } : { a: st.c });
+      Share.copy(url).then(function () { b.textContent = '복사했습니다'; })
+        .catch(function () { b.textContent = '복사 실패'; });
+    }));
+    if (key === 'sealed') acts.appendChild(btn('이 사건이 또 일어났습니다', 'btn-ghost', function () {
+      askVoid(st, card, acts);
+    }));
+
+    card.appendChild(top);
+    card.appendChild(what);
+    card.appendChild(line);
+    card.appendChild(acts);
+    return card;
+  }
+
+  /** 재발 신고. 이유를 한 줄 받아 수리증에 그대로 남긴다. */
+  function askVoid(st, card, acts) {
+    acts.hidden = true;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'case-acts';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 120;
+    input.placeholder = '무슨 일이 또 있었나요? (없어도 됩니다)';
+    input.style.flex = '1 1 100%';
+    wrap.appendChild(input);
+
+    wrap.appendChild(btn('수리증 효력 상실', 'btn-primary', function (b) {
+      b.disabled = true;
+      b.textContent = '처리 중';
+      Store.voidSeal(st.c, input.value.trim()).then(function (fresh) {
+        if (!fresh) { b.disabled = false; b.textContent = '실패. 다시'; return; }
+        var i = state.file.findIndex(function (x) { return x.c === st.c; });
+        if (i >= 0) state.file[i] = fresh;
+        renderFile();
+        $('#file-msg').textContent = st.to + ' 님의 수리증이 효력을 잃었습니다.';
+      });
+    }));
+    wrap.appendChild(btn('취소', 'btn-ghost', function () {
+      wrap.remove();
+      acts.hidden = false;
+    }));
+
+    card.appendChild(wrap);
+    input.focus();
+  }
+
+  function renderFile() {
+    var cases = state.file, list = $('#file-list');
+    list.textContent = '';
+
+    var sealed = 0, dead = 0;
+    cases.forEach(function (st) {
+      var k = statusOf(st);
+      if (k === 'sealed') sealed++;
+      if (k === 'dead') dead++;
+    });
+    $('#file-n').textContent = cases.length;
+    $('#file-sealed').textContent = sealed;
+    $('#file-void').textContent = dead;
+
+    if (!cases.length) {
+      var p = document.createElement('p');
+      p.className = 'file-empty';
+      p.textContent = '아직 발부한 요구서가 없습니다.';
+      list.appendChild(p);
+      return;
+    }
+    cases.forEach(function (st) { list.appendChild(caseCard(st)); });
+  }
+
+  function openFile() {
+    showScreen('screen-file', '사건철.');
+    $('#file-msg').textContent = '';
+    var list = $('#file-list');
+    list.textContent = '';
+    var p = document.createElement('p');
+    p.className = 'file-empty';
+    p.textContent = '불러오는 중입니다.';
+    list.appendChild(p);
+
+    Store.casefile().then(function (cases) {
+      state.file = cases;
+      renderFile();
+    });
+  }
+
+  function initFileScreen() {
+    $('#file-new').addEventListener('click', function () {
+      try { history.replaceState(null, '', Share.link({})); } catch (e) {}
+      showScreen('screen-write');
+    });
+    $('#load-new').addEventListener('click', function () {
+      try { history.replaceState(null, '', Share.link({})); } catch (e) {}
+      showScreen('screen-write');
+    });
+  }
+
+  /* ── 짧은 링크(사건 코드) 라우팅 ──────────────── */
+
+  /** ?d= ?r= ?a= 에 8자 코드가 들어 있으면 서버에서 불러온다. 긴 토큰은 예전 방식. */
+  function codeParam() {
+    var names = ['a', 'r', 'd'];
+    for (var i = 0; i < names.length; i++) {
+      var v = Share.param(names[i]);
+      if (Store.isCode(v)) return { mode: names[i], code: v };
+    }
+    return null;
+  }
+
+  function loadNote(title, msg, showBtn) {
+    $('#load-title').textContent = title;
+    $('#load-msg').textContent = msg;
+    $('#load-row').hidden = !showBtn;
+  }
+
+  function openByCode(mode, code) {
+    showScreen('screen-load', '사건 조회 중.');
+    loadNote('사건을 찾고 있습니다', '사건번호 ' + code, false);
+
+    Store.get(code).then(function (st) {
+      if (!st) {
+        return loadNote('사건을 찾을 수 없습니다',
+          '사건번호 ' + code + ' 는 만료되었거나 취소되었습니다. 사건 기록은 90일 뒤 자동으로 지워집니다.', true);
+      }
+      state.code = code;
+
+      if (st.settle && mode !== 'd') return openCert(asAccept(st), !!st.mine);
+      if (mode !== 'd') {
+        if (!st.verdict) {
+          return loadNote('아직 심사 전입니다',
+            josa(st.to, ['은', '는']) + ' 아직 심사를 받지 않았습니다. 결과가 나오면 이 링크에서 바로 보입니다.', true);
+        }
+        return openReceipt(asReceipt(st));
+      }
+      openDemand(asDemand(st));
+    });
+  }
+
   /* ── 진입 ───────────────────────────────────────────── */
 
   function boot() {
@@ -668,6 +920,20 @@
     initReceiptScreen();
     initSealScreen();
     initCertScreen();
+    initFileScreen();
+
+    // 서버가 살아 있으면 사건철 입구를 연다.
+    Store.available().then(function (on) {
+      return on ? Store.casefile() : [];
+    }).then(function (cases) {
+      state.file = cases;
+      if (!cases.length) return;
+      $('#write-file-row').hidden = false;
+      $('#btn-file-n').textContent = '(' + cases.length + ')';
+    });
+
+    var byCode = codeParam();
+    if (byCode) { openByCode(byCode.mode, byCode.code); return; }
 
     var acc = Share.decode(Share.param('a'));
     if (acc && acc.to && acc.aat) { openCert(acc, false); return; }

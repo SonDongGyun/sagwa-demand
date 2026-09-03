@@ -12,7 +12,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8D%8E%3C/text%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-<link rel="stylesheet" href="styles.css?v=7" />
+<link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
 <div class="grain" aria-hidden="true"></div>
@@ -70,6 +70,10 @@
 
         <button class="btn btn-primary btn-lg" type="submit">요구서 발부하기</button>
       </form>
+
+      <div class="btn-row" id="write-file-row" hidden>
+        <button class="btn btn-ghost" id="btn-file" type="button">내 사건철 열기 <b id="btn-file-n"></b></button>
+      </div>
     </div>
   </section>
 
@@ -87,6 +91,18 @@
       <div class="btn-row">
         <button class="btn btn-ghost" id="btn-preview" type="button">내가 먼저 열어보기</button>
         <button class="btn btn-ghost" id="btn-rewrite" type="button">다시 쓰기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── 2-b. 사건 불러오는 중 ───────── -->
+  <section class="screen" id="screen-load" hidden>
+    <div class="paper paper-narrow center">
+      <p class="trial-step">조회 중</p>
+      <h1 class="doc-title sm" id="load-title">사건을 찾고 있습니다</h1>
+      <p class="hint" id="load-msg">잠시만 기다려 주세요.</p>
+      <div class="btn-row" id="load-row" hidden>
+        <button class="btn btn-ghost" id="load-new" type="button">새 요구서 쓰기</button>
       </div>
     </div>
   </section>
@@ -353,6 +369,7 @@
 
         <p class="doc-foot">본 수리증은 동일 사건이 재발할 경우 <strong>즉시 효력을 잃습니다.</strong></p>
         <div class="stamp stamp-verdict" id="a-stamp" aria-hidden="true"><span id="a-stampname">수<br />리</span></div>
+        <div class="void-band" id="a-void" hidden><b>효력 상실</b><span id="a-void-why"></span></div>
       </div>
     </div>
 
@@ -370,14 +387,38 @@
     </div>
   </section>
 
+
+  <!-- ───────── 9. 내 사건철 ───────── -->
+  <section class="screen" id="screen-file" hidden>
+    <div class="paper">
+      <p class="trial-step">기록</p>
+      <h1 class="doc-title sm">내 사건철</h1>
+      <p class="lede" id="file-lede">이 기기에서 발부한 요구서만 보입니다. 로그인은 없습니다.</p>
+
+      <div class="meters three">
+        <div class="meter"><span class="meter-label">요구 <b id="file-n">0</b>건</span></div>
+        <div class="meter"><span class="meter-label">수리 <b id="file-sealed">0</b>건</span></div>
+        <div class="meter"><span class="meter-label">재발 <b id="file-void">0</b>회</span></div>
+      </div>
+
+      <div id="file-list"></div>
+      <p class="hint center" id="file-msg" role="status" aria-live="polite"></p>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="file-new" type="button">새 요구서 쓰기</button>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <footer class="footer">
   <p>본 문서는 법적 효력이 없습니다. 진짜 사과는 직접 하세요.</p>
 </footer>
 
-<script src="js/share.js?v=7"></script>
-<script src="js/games.js?v=7"></script>
-<script src="js/app.js?v=7"></script>
+<script src="js/share.js?v=8"></script>
+<script src="js/store.js?v=8"></script>
+<script src="js/games.js?v=8"></script>
+<script src="js/app.js?v=8"></script>
 </body>
 </html>
