@@ -12,7 +12,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%8D%8E%3C/text%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-<link rel="stylesheet" href="styles.css?v=3" />
+<link rel="stylesheet" href="styles.css?v=7" />
 </head>
 <body>
 <div class="grain" aria-hidden="true"></div>
@@ -280,10 +280,93 @@
       </ul>
       <p class="verdict-text" id="r-text"></p>
       <div class="btn-row">
-        <button class="btn btn-primary" id="r-accept" type="button">사과를 받아들인다</button>
+        <button class="btn btn-primary" id="r-accept" type="button">사과를 받아들입니다</button>
         <button class="btn btn-ghost" id="r-reject" type="button">재심 요구</button>
       </div>
       <p class="hint center" id="r-msg" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- ───────── 7. 사과 수리 : 도장 찍기 ───────── -->
+  <section class="screen" id="screen-seal" hidden>
+    <div class="paper">
+      <p class="trial-step">최종 절차</p>
+      <h1 class="doc-title sm">수리증에 도장을 찍으세요</h1>
+      <p class="lede">도장을 <strong>끝까지 눌러야</strong> 수리증이 발급됩니다.<br /><em>덜 찍힌 도장은 효력이 없습니다.</em></p>
+
+      <label class="field">
+        <span class="label">덧붙일 말 <em>(없어도 됩니다)</em></span>
+        <input id="seal-word" name="word" type="text" maxlength="60" placeholder="예: 다음엔 그냥 미리 말해줘" autocomplete="off" />
+      </label>
+
+      <div class="seal-stage">
+        <div class="seal-sheet">
+          <span class="seal-line"></span>
+          <span class="seal-line short"></span>
+          <span class="seal-line"></span>
+          <span class="seal-slot" id="seal-slot"><i id="seal-ink"></i></span>
+        </div>
+        <div class="seal-stamp" id="seal-stamp" aria-hidden="true">
+          <span class="seal-grip"></span>
+          <span class="seal-neck"></span>
+          <span class="seal-face" id="seal-face">인</span>
+        </div>
+      </div>
+
+      <div class="meters one">
+        <div class="meter">
+          <span class="meter-label">눌린 정도 <b id="seal-pct">0</b>%</span>
+          <div class="meter-bar"><div class="meter-fill" id="seal-fill"></div></div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg btn-hold" id="seal-btn" type="button">
+        꾹 눌러 도장 찍기 <em>(끝까지 누르고 있기)</em>
+      </button>
+      <p class="hint center" id="seal-msg" role="status" aria-live="polite">누르고 있으면 도장이 내려갑니다.</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="seal-back" type="button">아직 마음이 안 풀렸습니다</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── 8. 사과 수리증 ───────── -->
+  <section class="screen" id="screen-cert" hidden>
+    <div class="paper cert">
+      <div class="cert-border">
+        <p class="doc-no">수리번호 <span id="a-docno">제0000호</span></p>
+        <h1 class="doc-title">사과 수리증</h1>
+        <p class="doc-sub" id="a-sub">아래 사과는 정식으로 수리되었습니다.</p>
+
+        <p class="accept-body">
+          청구인 <b id="a-from">—</b><i class="j" id="a-fromj">은</i> 피청구인 <b id="a-to">—</b><i class="j">의</i> 사과를 <strong>수리</strong>합니다.<br />
+          본 건은 이로써 종결하며, 같은 사건으로 다시 묻지 않습니다.
+        </p>
+
+        <blockquote class="accept-word" id="a-word" hidden></blockquote>
+
+        <dl class="record small">
+          <div><dt>사건</dt><dd id="a-what">—</dd></div>
+          <div><dt>심사 결과</dt><dd id="a-result">—</dd></div>
+          <div><dt>수리일</dt><dd id="a-date">—</dd></div>
+        </dl>
+
+        <p class="doc-foot">본 수리증은 동일 사건이 재발할 경우 <strong>즉시 효력을 잃습니다.</strong></p>
+        <div class="stamp stamp-verdict" id="a-stamp" aria-hidden="true"><span id="a-stampname">수<br />리</span></div>
+      </div>
+    </div>
+
+    <div class="paper paper-narrow center after-cert">
+      <p class="best" id="a-note">—</p>
+      <div class="linkbox" id="a-share">
+        <input id="a-link" type="text" readonly aria-label="수리증 링크" />
+        <button class="btn btn-primary" id="a-copy" type="button">복사</button>
+      </div>
+      <p class="hint" id="a-copy-hint" role="status" aria-live="polite"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="a-print" type="button">인쇄 / PDF 저장</button>
+        <button class="btn btn-ghost" id="a-new" type="button">나도 요구서 쓰기</button>
+      </div>
     </div>
   </section>
 
@@ -293,8 +376,8 @@
   <p>본 문서는 법적 효력이 없습니다. 진짜 사과는 직접 하세요.</p>
 </footer>
 
-<script src="js/share.js?v=3"></script>
-<script src="js/games.js?v=3"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/share.js?v=7"></script>
+<script src="js/games.js?v=7"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>

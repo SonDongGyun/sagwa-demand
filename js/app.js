@@ -32,6 +32,7 @@
 
   var state = {
     demand: null,
+    receipt: null,
     dodges: 0,
     results: { bow: null, dictation: null, 'catch': null }
   };
@@ -367,16 +368,295 @@
     $('#r-text').textContent = grade.text
       + (rec.p ? ' (도주 시도로 ' + rec.p + '점이 깎인 결과입니다.)' : '');
     $('#r-msg').textContent = '';
+    state.receipt = rec;
     showScreen('screen-receipt', '심사 결과 도착.');
   }
 
   function initReceiptScreen() {
     $('#r-accept').addEventListener('click', function () {
-      $('#r-msg').textContent = '사과가 접수되었습니다. 이 건은 여기서 종결합니다. 🍎';
+      if (!state.receipt) return;
+      openSeal(state.receipt);
     });
     $('#r-reject').addEventListener('click', function () {
       $('#r-msg').textContent = '재심이 청구되었습니다. 상대에게 링크를 다시 보내세요.';
     });
+  }
+
+  /* ── 6. 도장 찍기 ───────────────────────────── */
+
+  var HOLD_MS = 1200;                 // 끝까지 누르고 있어야 하는 시간
+  var seal = { rec: null, t: 0, drop: 100, holding: false, done: false, raf: 0, last: 0 };
+
+  /** 이름을 도장에 새긴다. 세로쓰기 2~3글자. */
+  function stampName(el, name, fallback) {
+    var chars = Array.from(String(name || '').replace(/\s+/g, '')).slice(0, 3);
+    if (!chars.length) chars = Array.from(fallback);
+    el.textContent = '';
+    chars.forEach(function (c, i) {
+      if (i) el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(c));
+    });
+  }
+
+  function dateTimeStr(ts) {
+    var d = new Date(ts || Date.now());
+    return dateStr(ts) + ' ' + String(d.getHours()).padStart(2, '0') + '시 '
+         + String(d.getMinutes()).padStart(2, '0') + '분';
+  }
+
+  function openSeal(rec) {
+    seal.rec = rec;
+    seal.t = 0; seal.done = false; seal.holding = false;
+    if (seal.raf) cancelAnimationFrame(seal.raf);
+    seal.raf = 0;
+
+    $('#seal-btn').disabled = false;
+    $('#seal-btn').classList.remove('is-down');
+
+    $('#seal-word').value = '';
+    $('#seal-slot').classList.remove('inked');
+    $('#seal-ink').textContent = '';
+    $('#seal-face').textContent = Array.from(String(rec.from || '').replace(/\s+/g, '')).slice(0, 3).join('') || '수리';
+    $('#seal-stamp').classList.remove('pressing');
+    $('#seal-stamp').style.transform = 'translateY(0px)';
+    $('#seal-fill').style.width = '0%';
+    $('#seal-pct').textContent = '0';
+    $('#seal-msg').textContent = '누르고 있으면 도장이 내려갑니다.';
+
+    showScreen('screen-seal', '사과를 받아들이는 중.');
+
+    // 화면이 보이는 뒤에야 좌표가 나온다. 도장면이 인주 자리까지 가는 거리.
+    var slot = $('#seal-slot').getBoundingClientRect();
+    var face = $('#seal-face').getBoundingClientRect();
+    seal.drop = (slot.height && face.height)
+      ? Math.max(40, Math.round(slot.top + slot.height * 0.6 - face.bottom))
+      : 100;
+  }
+
+  function initSealScreen() {
+    var btn = $('#seal-btn'), stamp = $('#seal-stamp'), sheet = $('.seal-sheet'),
+        slot = $('#seal-slot'), ink = $('#seal-ink'), msg = $('#seal-msg');
+
+    function paint() {
+      stamp.style.transform = 'translateY(' + (seal.drop * seal.t).toFixed(1) + 'px)';
+      $('#seal-fill').style.width = (seal.t * 100).toFixed(0) + '%';
+      $('#seal-pct').textContent = Math.round(seal.t * 100);
+    }
+
+    function impress() {
+      seal.done = true; seal.holding = false; seal.t = 1;
+      paint();
+      btn.classList.remove('is-down');
+      btn.disabled = true;
+      stampName(ink, seal.rec.from, '수리');
+      slot.classList.add('inked');
+      sheet.classList.add('shook');
+      msg.textContent = '찍혔습니다. 수리증을 발급합니다.';
+
+      setTimeout(function () {                       // 도장을 다시 들어올린다
+        stamp.classList.remove('pressing');
+        stamp.style.transform = 'translateY(0px)';
+        sheet.classList.remove('shook');
+      }, 340);
+
+      setTimeout(function () {
+        var word = $('#seal-word').value.trim();
+        var r = seal.rec;
+        openCert({
+          v: 1, to: r.to, from: r.from, what: r.what, s: r.s,
+          b: r.b, t: r.t, c: r.c, p: r.p, at: r.at,
+          w: word ? shorten(word, 60) : '', aat: Date.now()
+        }, true);
+      }, 1250);
+    }
+
+    function tick(now) {
+      var dt = Math.min(0.05, (now - seal.last) / 1000);
+      seal.last = now;
+      if (seal.holding) {
+        seal.t += dt * 1000 / HOLD_MS;
+        if (seal.t >= 1) { seal.raf = 0; return impress(); }
+      } else {
+        seal.t -= dt * 3.2;                          // 놓으면 튀어오른다
+        if (seal.t <= 0) { seal.t = 0; paint(); seal.raf = 0; return; }
+      }
+      paint();
+      seal.raf = requestAnimationFrame(tick);
+    }
+
+    function press(e) {
+      if (seal.done || seal.holding) return;
+      if (e && e.preventDefault) e.preventDefault();
+      seal.holding = true;
+      stamp.classList.add('pressing');
+      btn.classList.add('is-down');
+      msg.textContent = '그대로 누르고 계세요.';
+      if (!seal.raf) { seal.last = performance.now(); seal.raf = requestAnimationFrame(tick); }
+    }
+
+    function release() {
+      if (seal.done || !seal.holding) return;
+      seal.holding = false;
+      btn.classList.remove('is-down');
+      stamp.classList.remove('pressing');
+      msg.textContent = '덜 찍혔습니다. ' + Math.round(seal.t * 100)
+        + '%에서 손을 떼셨습니다. 끝까지 누르세요.';
+    }
+
+    btn.addEventListener('pointerdown', press);
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    btn.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    window.addEventListener('keydown', function (e) {
+      if ($('#screen-seal').hidden) return;
+      if (e.target && e.target.tagName === 'INPUT') return;
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'Enter') {
+        if (!e.repeat) press(e);
+      }
+    });
+    window.addEventListener('keyup', function (e) {
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'Enter') release();
+    });
+
+    // 잘못 눌렀으면 돌아갈 수 있어야 한다. 강제로 용서시키지 않는다.
+    $('#seal-back').addEventListener('click', function () {
+      if (seal.done) return;
+      seal.holding = false;
+      if (seal.raf) cancelAnimationFrame(seal.raf);
+      seal.raf = 0; seal.t = 0; paint();
+      showScreen('screen-receipt', '심사 결과 도착.');
+      $('#r-msg').textContent = '아직 수리하지 않았습니다. 마음이 풀리면 다시 누르세요.';
+    });
+  }
+
+  /* ── 7. 사과 수리증 ────────────────────────── */
+
+  /**
+   * @param {object}  acc   수리 토큰
+   * @param {boolean} mine  내가 방금 찍은 것이면 true(보낼 링크를 보여준다),
+   *                        링크로 받아서 열었으면 false(사과비가 내린다).
+   */
+  function openCert(acc, mine) {
+    var grade = gradeOf(acc.s);
+
+    $('#a-docno').textContent = docNo(String(acc.from) + acc.to + acc.aat);
+    var from = acc.from || '청구인', to = acc.to || '피청구인';
+    $('#a-from').textContent = from;
+    $('#a-fromj').textContent = josa(from, ['은', '는']).slice(String(from).length);
+    $('#a-to').textContent = to;
+    $('#a-what').textContent = acc.what || '—';
+    $('#a-result').textContent = grade.letter + ' · ' + grade.name + ' · 진정성 ' + acc.s + '점';
+    $('#a-date').textContent = dateTimeStr(acc.aat);
+
+    var word = $('#a-word');
+    word.textContent = acc.w ? '“' + acc.w + '”' : '';
+    word.hidden = !acc.w;
+
+    $('#a-sub').textContent = mine
+      ? '아래 사과는 정식으로 수리되었습니다.'
+      : (acc.to || '당신') + ' 님의 사과가 받아들여졌습니다.';
+
+    stampName($('#a-stampname'), acc.from, '수리');
+    var st = $('#a-stamp');
+    st.classList.remove('hit');
+    setTimeout(function () { st.classList.add('hit'); }, 600);
+
+    $('#a-share').hidden = !mine;
+    $('#a-copy-hint').textContent = '';
+    $('#a-note').textContent = mine
+      ? '사과한 사람에게 이 링크를 보내면 수리증이 전달됩니다.'
+      : '이 건은 종결되었습니다. 수리증을 인쇄해 두셔도 됩니다.';
+
+    if (mine) $('#a-link').value = Share.link({ a: Share.encode(acc) });
+
+    showScreen('screen-cert', mine ? '수리증 발급 완료.' : '사과가 수리되었습니다.');
+    if (!mine) appleRain(4200);
+  }
+
+  function initCertScreen() {
+    bindCopy('#a-link', '#a-copy', '#a-copy-hint');
+    $('#a-print').addEventListener('click', function () { window.print(); });
+    $('#a-new').addEventListener('click', function () {
+      try { history.replaceState(null, '', Share.link({})); } catch (e) {}
+      showScreen('screen-write');
+    });
+  }
+
+  /* ── 사과비 ─────────────────────────────── */
+
+  function drawApple(ctx, x, y, r, gold) {
+    ctx.save();
+    ctx.translate(x, y);
+    var g = ctx.createRadialGradient(-r * .35, -r * .4, r * .2, 0, 0, r);
+    if (gold) { g.addColorStop(0, '#ffd76a'); g.addColorStop(1, '#e09400'); }
+    else { g.addColorStop(0, '#ff6369'); g.addColorStop(1, '#b5252b'); }
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * .55);
+    ctx.bezierCurveTo(r * 1.15, -r * 1.25, r * 1.3, r * .75, 0, r);
+    ctx.bezierCurveTo(-r * 1.3, r * .75, -r * 1.15, -r * 1.25, 0, -r * .55);
+    ctx.fill();
+    ctx.strokeStyle = '#5a4632';
+    ctx.lineWidth = Math.max(1.4, r * .14);
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, -r * .68); ctx.lineTo(r * .18, -r * 1.22); ctx.stroke();
+    ctx.fillStyle = '#30a46c';
+    ctx.beginPath(); ctx.ellipse(r * .55, -r * 1.02, r * .42, r * .2, -.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  /** 수리증을 받은 쪽 화면에만 사과를 뿌린다. */
+  function appleRain(ms) {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var cv = document.createElement('canvas');
+    cv.className = 'rain';
+    cv.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(cv);
+
+    var ctx = cv.getContext('2d');
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = 0, h = 0;
+    function fit() {
+      w = window.innerWidth; h = window.innerHeight;
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    fit();
+    window.addEventListener('resize', fit);
+
+    var drops = [];
+    for (var i = 0; i < 34; i++) {
+      drops.push({
+        x: Math.random() * w, y: -Math.random() * h * 1.2,
+        r: 6 + Math.random() * 6, vy: 95 + Math.random() * 150,
+        sway: Math.random() * 6.28, spin: .7 + Math.random() * 1.6,
+        gold: Math.random() < .14
+      });
+    }
+
+    var start = 0, last = 0;
+    function frame(now) {
+      if (!start) { start = now; last = now; }
+      var dt = Math.min(.05, (now - last) / 1000);
+      last = now;
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalAlpha = .82;                    // 글씨를 덮지 않게
+      for (var i = 0; i < drops.length; i++) {
+        var p = drops[i];
+        p.y += p.vy * dt;
+        p.sway += dt * p.spin * 2;
+        if (p.y - p.r * 1.4 > h) { p.y = -p.r * 2; p.x = Math.random() * w; }
+        drawApple(ctx, p.x + Math.sin(p.sway) * 14, p.y, p.r, p.gold);
+      }
+      if (now - start < ms) {
+        requestAnimationFrame(frame);
+      } else {
+        window.removeEventListener('resize', fit);
+        cv.style.opacity = '0';
+        setTimeout(function () { if (cv.parentNode) cv.parentNode.removeChild(cv); }, 750);
+      }
+    }
+    requestAnimationFrame(frame);
   }
 
   /* ── 진입 ───────────────────────────────────────────── */
@@ -386,6 +666,11 @@
     initDemandScreen();
     initVerdictScreen();
     initReceiptScreen();
+    initSealScreen();
+    initCertScreen();
+
+    var acc = Share.decode(Share.param('a'));
+    if (acc && acc.to && acc.aat) { openCert(acc, false); return; }
 
     var rec = Share.decode(Share.param('r'));
     if (rec && rec.to) { openReceipt(rec); return; }
