@@ -892,7 +892,18 @@
     showScreen('screen-load', '사건 조회 중.');
     loadNote('사건을 찾고 있습니다', '사건번호 ' + code, false);
 
-    Store.get(code).then(function (st) {
+    // 서버가 내려가 있으면 '없는 사건' 이 아니다. 남 탓을 하지 않는다.
+    Store.available().then(function (on) {
+      if (!on) {
+        return loadNote('지금은 사건을 조회할 수 없습니다',
+          '사건번호 ' + code + ' 는 서버에 보관된 링크입니다. 잠시 뒤에 다시 열어 보세요.', true);
+      }
+      return lookup(mode, code);
+    });
+  }
+
+  function lookup(mode, code) {
+    return Store.get(code).then(function (st) {
       if (!st) {
         return loadNote('사건을 찾을 수 없습니다',
           '사건번호 ' + code + ' 는 만료되었거나 취소되었습니다. 사건 기록은 90일 뒤 자동으로 지워집니다.', true);
